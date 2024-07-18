@@ -14,6 +14,8 @@ constexpr int VERIFICATION_SAMPLES = 2000; // Number of random samples to verify
 
 void matmul(sycl::queue& q, float (*a)[N], float (*b)[P], float (*c)[P]);
 int verifyResult(float (*c_back)[P], bool full_verify = false);
+void initializeMatrixA(sycl::queue& q, float (*a)[N]);
+void initializeMatrixB(sycl::queue& q, float (*b)[P]);
 
 int main(int argc, char* argv[]) {
   float (*a)[N] = nullptr;
@@ -45,13 +47,8 @@ int main(int argc, char* argv[]) {
               << ") * b(" << N << "," << P << ")\n";
 
     // Initialize matrices
-    q.parallel_for(sycl::range(M, N), [=](sycl::id<2> index) {
-      a[index[0]][index[1]] = 1.0f;
-    }).wait();
-
-    q.parallel_for(sycl::range(N, P), [=](sycl::id<2> index) {
-      b[index[0]][index[1]] = index[0] + 1.0f;
-    }).wait();
+    initializeMatrixA(q, a);
+    initializeMatrixB(q, b);
 
     for (int iter = 0; iter < ITERATIONS; ++iter) {
       std::cout << "Iteration " << iter + 1 << " of " << ITERATIONS << std::endl;
@@ -144,4 +141,16 @@ int verifyResult(float (*c_back)[P], bool full_verify) {
     std::cout << "Fail - Mismatch rate: " << mismatch_rate << "%\n";
     return -1;
   }
+}
+
+void initializeMatrixA(sycl::queue& q, float (*a)[N]) {
+  q.parallel_for(sycl::range(M, N), [=](sycl::id<2> index) {
+    a[index[0]][index[1]] = 1.0f;
+  }).wait();
+}
+
+void initializeMatrixB(sycl::queue& q, float (*b)[P]) {
+  q.parallel_for(sycl::range(N, P), [=](sycl::id<2> index) {
+    b[index[0]][index[1]] = index[0] + 1.0f;
+  }).wait();
 }
