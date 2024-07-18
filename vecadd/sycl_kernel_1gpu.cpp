@@ -8,6 +8,7 @@ using namespace sycl;
 
 // Array size for this example.
 size_t array_size = 100000000;
+constexpr int ITERATIONS = 100;
 
 // Create an exception handler for asynchronous SYCL exceptions
 static auto exception_handler = [](sycl::exception_list e_list)
@@ -34,19 +35,8 @@ static auto exception_handler = [](sycl::exception_list e_list)
 void
 VectorAdd(queue &q, const int *a, const int *b, int *sum, size_t size)
 {
-  // Create the range object for the arrays.
   range<1> num_items{size};
-
-  // Use parallel_for to run vector addition in parallel on device. This
-  // executes the kernel.
-  //    1st parameter is the number of work items.
-  //    2nd parameter is the kernel, a lambda that specifies what to do per
-  //    work item. the parameter of the lambda is the work item id.
-  // SYCL supports unnamed lambda kernel by default.
   auto e = q.parallel_for(num_items, [=](auto i) { sum[i] = a[i] + b[i]; });
-
-  // q.parallel_for() is an asynchronous call. SYCL runtime enqueues and runs
-  // the kernel asynchronously. Wait for the asynchronous call to complete.
   e.wait();
 }
 
@@ -65,12 +55,10 @@ InitializeArray(int *a, size_t size)
 int
 main(int argc, char *argv[])
 {
-  auto start_time = std::chrono::high_resolution_clock::now();
+  auto total_start_time = std::chrono::high_resolution_clock::now();
 
-  // Change array_size if it was passed as argument
   if (argc > 1) array_size = std::stoi(argv[1]);
 
-  // The default device selector will select the most performant device.
   auto selector = default_selector_v;
 
   try
@@ -109,7 +97,20 @@ main(int argc, char *argv[])
     for (size_t i = 0; i < array_size; i++) sum_sequential[i] = a[i] + b[i];
 
     // Vector addition in SYCL.
-    VectorAdd(q, a, b, sum_parallel, array_size);
+    auto kernel_start_time = std::chrono::high_resolution_clock::now();
+    for (int iter = 0; iter < ITERATIONS; iter++)
+    {
+      VectorAdd(q, a, b, sum_parallel, array_size);
+
+      if (iter % 10 == 0)
+      {
+        std::cout << "Completed iteration " << iter << std::endl;
+      }
+    }
+    auto kernel_end_time = std::chrono::high_resolution_clock::now();
+    auto kernel_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            kernel_end_time - kernel_start_time);
 
     // Verify that the two arrays are equal.
     for (size_t i = 0; i < array_size; i++)
@@ -137,6 +138,9 @@ main(int argc, char *argv[])
     free(b, q);
     free(sum_sequential, q);
     free(sum_parallel, q);
+
+    std::cout << "Kernel execution time for " << ITERATIONS << " iterations: "
+              << kernel_duration.count() << " milliseconds\n";
   }
   catch (exception const &e)
   {
@@ -144,10 +148,10 @@ main(int argc, char *argv[])
     std::terminate();
   }
 
-  auto end_time = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      end_time - start_time);
-  std::cout << "Total execution time: " << duration.count()
+  auto total_end_time = std::chrono::high_resolution_clock::now();
+  auto total_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      total_end_time - total_start_time);
+  std::cout << "Total execution time: " << total_duration.count()
             << " milliseconds\n";
 
   std::cout << "Vector add successfully completed on device.\n";

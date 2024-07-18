@@ -1,7 +1,0 @@
-Current working directory: /home/ynxia/pg/sycl-samples
-Using device 0: Intel(R) Data Center GPU Max 1550
-Using device 1: Intel(R) Data Center GPU Max 1550
-Vector size: 100000000
-Vector addition is correct on both devices.
-Total execution time: 892 milliseconds
-Vector add completed on two devices.

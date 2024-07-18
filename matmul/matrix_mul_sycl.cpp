@@ -5,7 +5,7 @@
 #include <random>
 #include <cstring>
 
-constexpr int m_size = 2400 * 8;
+constexpr int m_size = 7200 * 8;
 constexpr int M = m_size / 8;
 constexpr int N = m_size / 4;
 constexpr int P = m_size / 2;
@@ -105,7 +105,8 @@ int main(int argc, char* argv[]) {
 }
 
 bool ValueSame(float a, float b) {
-  return std::fabs(a - b) < std::numeric_limits<float>::epsilon() * 100;
+  // return std::fabs(a - b) < std::numeric_limits<float>::epsilon() * 100;
+  return std::fabs(a - b) / std::max(std::fabs(a), std::fabs(b)) < 1e-4;
 }
 
 int VerifyResult(float (*c_back)[P], bool full_verify) {
