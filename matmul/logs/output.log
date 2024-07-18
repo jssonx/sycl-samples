@@ -1,0 +1,4 @@
+Current working directory: /home/ynxia/pg/sycl-samples
+Device: Intel(R) Data Center GPU Max 1550
+Problem size: c(150,600) = a(150,300) * b(300,600)
+Result of matrix multiplication using SYCL: Success - The results are correct!
