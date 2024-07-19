@@ -9,16 +9,11 @@ using namespace sycl;
 
 size_t array_size = 100000000;
 
-static auto exception_handler = [](sycl::exception_list e_list)
-{
-  for (std::exception_ptr const& e : e_list)
-  {
-    try
-    {
+static auto exception_handler = [](sycl::exception_list e_list) {
+  for (std::exception_ptr const& e : e_list) {
+    try {
       std::rethrow_exception(e);
-    }
-    catch (std::exception const& e)
-    {
+    } catch (std::exception const& e) {
 #if _DEBUG
       std::cout << "Failure" << std::endl;
 #endif
@@ -27,34 +22,27 @@ static auto exception_handler = [](sycl::exception_list e_list)
   }
 };
 
-void
-VectorAdd(queue& q, const int* a, const int* b, int* sum, size_t size)
-{
+void VectorAdd(queue& q, const int* a, const int* b, int* sum, size_t size) {
   range<1> num_items{size};
   auto e = q.parallel_for(num_items, [=](auto i) { sum[i] = a[i] + b[i]; });
   e.wait();
 }
 
-int
-main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
   auto start_time = std::chrono::high_resolution_clock::now();
 
   if (argc > 1) array_size = std::stoi(argv[1]);
 
-  try
-  {
+  try {
     // Get all GPU devices
     auto platforms = platform::get_platforms();
     std::vector<device> gpu_devices;
-    for (auto& platform : platforms)
-    {
+    for (auto& platform : platforms) {
       auto devices = platform.get_devices(info::device_type::gpu);
       gpu_devices.insert(gpu_devices.end(), devices.begin(), devices.end());
     }
 
-    if (gpu_devices.size() < 2)
-    {
+    if (gpu_devices.size() < 2) {
       std::cout << "Not enough GPU devices available. At least 2 GPUs are "
                    "required.\n";
       return -1;
@@ -64,22 +52,18 @@ main(int argc, char* argv[])
     std::vector<device> main_devices = {gpu_devices[0], gpu_devices[1]};
     std::vector<std::vector<device>> all_sub_devices;
 
-    for (int i = 0; i < 2; ++i)
-    {
+    for (int i = 0; i < 2; ++i) {
       std::cout << "Main device " << i << ": "
                 << main_devices[i].get_info<info::device::name>() << "\n";
       std::vector<device> sub_devices;
-      try
-      {
+      try {
         sub_devices =
             main_devices[i]
                 .create_sub_devices<
                     info::partition_property::partition_by_affinity_domain>(
                     info::partition_affinity_domain::next_partitionable);
         std::cout << "  Number of sub-devices: " << sub_devices.size() << "\n";
-      }
-      catch (exception& e)
-      {
+      } catch (exception& e) {
         std::cout << "  Failed to create sub-devices: " << e.what() << "\n";
         std::cout << "  Using the main device as a single sub-device.\n";
         sub_devices.push_back(main_devices[i]);
@@ -91,11 +75,9 @@ main(int argc, char* argv[])
 
     // Create queues for all sub-devices
     std::vector<std::vector<queue>> all_queues;
-    for (const auto& sub_devices : all_sub_devices)
-    {
+    for (const auto& sub_devices : all_sub_devices) {
       std::vector<queue> device_queues;
-      for (const auto& sub_dev : sub_devices)
-      {
+      for (const auto& sub_dev : sub_devices) {
         device_queues.emplace_back(sub_dev, exception_handler);
       }
       all_queues.push_back(device_queues);
@@ -106,12 +88,10 @@ main(int argc, char* argv[])
     int* sum_sequential = malloc_shared<int>(array_size, all_queues[0][0]);
 
     size_t main_sub_size = array_size / 2;
-    for (int i = 0; i < 2; ++i)
-    {
+    for (int i = 0; i < 2; ++i) {
       size_t sub_device_count = all_sub_devices[i].size();
       size_t sub_size = main_sub_size / sub_device_count;
-      for (size_t j = 0; j < sub_device_count; ++j)
-      {
+      for (size_t j = 0; j < sub_device_count; ++j) {
         size_t local_size = (j == sub_device_count - 1)
                                 ? (main_sub_size - j * sub_size)
                                 : sub_size;
@@ -123,19 +103,16 @@ main(int argc, char* argv[])
     }
 
     // Initialize arrays
-    for (int i = 0; i < 2; ++i)
-    {
+    for (int i = 0; i < 2; ++i) {
       size_t main_offset = i * main_sub_size;
       size_t sub_device_count = all_sub_devices[i].size();
       size_t sub_size = main_sub_size / sub_device_count;
-      for (size_t j = 0; j < sub_device_count; ++j)
-      {
+      for (size_t j = 0; j < sub_device_count; ++j) {
         size_t local_offset = j * sub_size;
         size_t local_size = (j == sub_device_count - 1)
                                 ? (main_sub_size - j * sub_size)
                                 : sub_size;
-        for (size_t k = 0; k < local_size; ++k)
-        {
+        for (size_t k = 0; k < local_size; ++k) {
           size_t global_index = main_offset + local_offset + k;
           a_list[i][j][k] = global_index;
           b_list[i][j][k] = global_index;
@@ -144,18 +121,15 @@ main(int argc, char* argv[])
     }
 
     // Sequential computation for verification
-    for (size_t i = 0; i < array_size; i++)
-    {
+    for (size_t i = 0; i < array_size; i++) {
       sum_sequential[i] = i + i;
     }
 
     // Compute in parallel on all sub-devices
-    for (int i = 0; i < 2; ++i)
-    {
+    for (int i = 0; i < 2; ++i) {
       size_t sub_device_count = all_sub_devices[i].size();
       size_t sub_size = main_sub_size / sub_device_count;
-      for (size_t j = 0; j < sub_device_count; ++j)
-      {
+      for (size_t j = 0; j < sub_device_count; ++j) {
         size_t local_size = (j == sub_device_count - 1)
                                 ? (main_sub_size - j * sub_size)
                                 : sub_size;
@@ -165,32 +139,26 @@ main(int argc, char* argv[])
     }
 
     // Wait for all queues to complete
-    for (auto& device_queues : all_queues)
-    {
-      for (auto& q : device_queues)
-      {
+    for (auto& device_queues : all_queues) {
+      for (auto& q : device_queues) {
         q.wait_and_throw();
       }
     }
 
     // Verification
     bool correct = true;
-    for (int i = 0; i < 2; ++i)
-    {
+    for (int i = 0; i < 2; ++i) {
       size_t main_offset = i * main_sub_size;
       size_t sub_device_count = all_sub_devices[i].size();
       size_t sub_size = main_sub_size / sub_device_count;
-      for (size_t j = 0; j < sub_device_count; ++j)
-      {
+      for (size_t j = 0; j < sub_device_count; ++j) {
         size_t local_offset = j * sub_size;
         size_t local_size = (j == sub_device_count - 1)
                                 ? (main_sub_size - j * sub_size)
                                 : sub_size;
-        for (size_t k = 0; k < local_size; ++k)
-        {
+        for (size_t k = 0; k < local_size; ++k) {
           size_t global_index = main_offset + local_offset + k;
-          if (sum_parallel_list[i][j][k] != sum_sequential[global_index])
-          {
+          if (sum_parallel_list[i][j][k] != sum_sequential[global_index]) {
             correct = false;
             std::cout << "Mismatch at device " << i << ", sub-device " << j
                       << ", local index " << k << ", global index "
@@ -202,30 +170,23 @@ main(int argc, char* argv[])
       }
     }
 
-    if (correct)
-    {
+    if (correct) {
       std::cout
           << "Vector addition is correct on all devices and sub-devices.\n";
-    }
-    else
-    {
+    } else {
       std::cout << "Vector addition failed.\n";
     }
 
     // Clean up
-    for (int i = 0; i < 2; ++i)
-    {
-      for (size_t j = 0; j < all_sub_devices[i].size(); ++j)
-      {
+    for (int i = 0; i < 2; ++i) {
+      for (size_t j = 0; j < all_sub_devices[i].size(); ++j) {
         free(a_list[i][j], all_queues[i][j]);
         free(b_list[i][j], all_queues[i][j]);
         free(sum_parallel_list[i][j], all_queues[i][j]);
       }
     }
     free(sum_sequential, all_queues[0][0]);
-  }
-  catch (exception const& e)
-  {
+  } catch (exception const& e) {
     std::cout << "An exception is caught: " << e.what() << "\n";
     return -1;
   }

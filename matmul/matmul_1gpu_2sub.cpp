@@ -13,16 +13,32 @@ constexpr int ITERATIONS = 10;
 constexpr int VERIFICATION_SAMPLES =
     2000;  // Number of random samples to verify
 
+static auto exception_handler = [](sycl::exception_list e_list) {
+  for (std::exception_ptr const& e : e_list) {
+    try {
+      std::rethrow_exception(e);
+    } catch (std::exception const& e) {
+#if _DEBUG
+      std::cout << "Failure" << std::endl;
+#endif
+      std::terminate();
+    }
+  }
+};
+
 void matmul(sycl::queue& q, float (*a)[N], float (*b)[P], float (*c)[P]);
-int verifyResult(float (*c_back)[P], bool full_verify = false);
+int verifyResultSingle(float (*c_back)[P], bool full_verify = false);
+int verifyResult(std::vector<float (*)[P]>& c_matrices,
+                 bool full_verify = false);
 void initializeMatrixA(sycl::queue& q, float (*a)[N]);
 void initializeMatrixB(sycl::queue& q, float (*b)[P]);
 
 int main(int argc, char* argv[]) {
-  float(*a)[N] = nullptr;
-  float(*b)[P] = nullptr;
-  float(*c_back)[P] = nullptr;
-  sycl::queue q;
+  std::vector<float(*)[N]> a_matrices(2);
+  std::vector<float(*)[P]> b_matrices(2);
+  std::vector<float(*)[P]> c_matrices(2);
+  std::vector<sycl::queue> queues;
+  std::vector<sycl::device> sub_devices;
 
   bool full_verify = false;
   if (argc > 1 && std::strcmp(argv[1], "--full-verify") == 0) {
@@ -35,41 +51,70 @@ int main(int argc, char* argv[]) {
     auto l0_selector = [](const sycl::device& dev) {
       return dev.get_platform().get_backend() == sycl::backend::ext_oneapi_level_zero;
     };
-    q = sycl::queue(l0_selector);
-    std::cout << "Device: "
-              << q.get_device().get_info<sycl::info::device::name>() << "\n";
 
-    // Allocate USM memory
-    a = static_cast<float(*)[N]>(sycl::malloc_shared(M * N * sizeof(float), q));
-    b = static_cast<float(*)[P]>(sycl::malloc_shared(N * P * sizeof(float), q));
-    c_back =
-        static_cast<float(*)[P]>(sycl::malloc_shared(M * P * sizeof(float), q));
+    sycl::device root_device(l0_selector);
+    std::cout << "Main device: "
+              << root_device.get_info<sycl::info::device::name>() << "\n";
 
-    if (!a || !b || !c_back) {
-      throw std::runtime_error("USM allocation failed");
+    // Create sub-devices
+    sub_devices = root_device.create_sub_devices<
+        sycl::info::partition_property::partition_by_affinity_domain>(
+        sycl::info::partition_affinity_domain::next_partitionable);
+
+    if (sub_devices.size() < 2) {
+      throw std::runtime_error("Not enough sub-devices available");
+    }
+
+    // Create queues for each sub-device
+    for (int i = 0; i < 2; ++i) {
+      queues.emplace_back(sub_devices[i], exception_handler);
+      std::cout << "Sub-device " << i << ": "
+                << sub_devices[i].get_info<sycl::info::device::name>() << "\n";
+    }
+
+    // Allocate USM memory for each sub-device
+    for (int i = 0; i < 2; ++i) {
+      a_matrices[i] = static_cast<float(*)[N]>(
+          sycl::malloc_shared(M * N * sizeof(float), queues[i]));
+      b_matrices[i] = static_cast<float(*)[P]>(
+          sycl::malloc_shared(N * P * sizeof(float), queues[i]));
+      c_matrices[i] = static_cast<float(*)[P]>(
+          sycl::malloc_shared(M * P * sizeof(float), queues[i]));
+
+      if (!a_matrices[i] || !b_matrices[i] || !c_matrices[i]) {
+        throw std::runtime_error("USM allocation failed for sub-device " +
+                                 std::to_string(i));
+      }
+
+      initializeMatrixA(queues[i], a_matrices[i]);
+      initializeMatrixB(queues[i], b_matrices[i]);
     }
 
     std::cout << "Problem size: c(" << M << "," << P << ") = a(" << M << ","
               << N << ") * b(" << N << "," << P << ")\n";
 
-    // Initialize matrices
-    initializeMatrixA(q, a);
-    initializeMatrixB(q, b);
-
     for (int iter = 0; iter < ITERATIONS; ++iter) {
       std::cout << "Iteration " << iter + 1 << " of " << ITERATIONS
                 << std::endl;
 
-      // Call the matmul function
-      matmul(q, a, b, c_back);
-    }
+      for (int i = 0; i < 2; ++i) {
+        std::cout << "Executing on sub-device " << i << ": " << "\n";
+        matmul(queues[i], a_matrices[i], b_matrices[i], c_matrices[i]);
+      }
 
+      for (auto& q : queues) {
+        q.wait();
+      }
+    }
   } catch (sycl::exception const& e) {
     std::cout << "An exception is caught while multiplying matrices: "
               << e.what() << "\n";
-    sycl::free(a, q);
-    sycl::free(b, q);
-    sycl::free(c_back, q);
+    // Cleanup
+    for (int i = 0; i < 2; ++i) {
+      sycl::free(a_matrices[i], queues[i]);
+      sycl::free(b_matrices[i], queues[i]);
+      sycl::free(c_matrices[i], queues[i]);
+    }
     return -1;
   }
 
@@ -81,7 +126,7 @@ int main(int argc, char* argv[]) {
             << " seconds" << std::endl;
 
   auto verify_start = std::chrono::high_resolution_clock::now();
-  int result = verifyResult(c_back, full_verify);
+  int result = verifyResult(c_matrices, full_verify);
   auto verify_end = std::chrono::high_resolution_clock::now();
   auto verify_duration = std::chrono::duration_cast<std::chrono::microseconds>(
       verify_end - verify_start);
@@ -90,9 +135,11 @@ int main(int argc, char* argv[]) {
             << " seconds" << std::endl;
 
   // Free USM memory
-  sycl::free(a, q);
-  sycl::free(b, q);
-  sycl::free(c_back, q);
+  for (int i = 0; i < 2; ++i) {
+    sycl::free(a_matrices[i], queues[i]);
+    sycl::free(b_matrices[i], queues[i]);
+    sycl::free(c_matrices[i], queues[i]);
+  }
 
   std::cout << "Total execution time: "
             << (duration + verify_duration).count() / 1000000.0 << " seconds"
@@ -116,11 +163,10 @@ void matmul(sycl::queue& q, float (*a)[N], float (*b)[P], float (*c)[P]) {
 }
 
 bool valueSame(float a, float b) {
-  // return std::fabs(a - b) < std::numeric_limits<float>::epsilon() * 100;
   return std::fabs(a - b) / std::max(std::fabs(a), std::fabs(b)) < 1e-4;
 }
 
-int verifyResult(float (*c_back)[P], bool full_verify) {
+int verifyResultSingle(float (*c_back)[P], bool full_verify) {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis_m(0, M - 1);
@@ -156,6 +202,15 @@ int verifyResult(float (*c_back)[P], bool full_verify) {
     std::cout << "Fail - Mismatch rate: " << mismatch_rate << "%\n";
     return -1;
   }
+}
+
+int verifyResult(std::vector<float (*)[P]>& c_matrices, bool full_verify) {
+  int result = 0;
+  for (int i = 0; i < 2; ++i) {
+    std::cout << "Verifying result from sub-device " << i << ":\n";
+    result |= verifyResultSingle(c_matrices[i], full_verify);
+  }
+  return result;
 }
 
 void initializeMatrixA(sycl::queue& q, float (*a)[N]) {

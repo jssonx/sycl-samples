@@ -11,16 +11,11 @@ size_t array_size = 100000000;
 constexpr int ITERATIONS = 100;
 
 // Create an exception handler for asynchronous SYCL exceptions
-static auto exception_handler = [](sycl::exception_list e_list)
-{
-  for (std::exception_ptr const &e : e_list)
-  {
-    try
-    {
+static auto exception_handler = [](sycl::exception_list e_list) {
+  for (std::exception_ptr const &e : e_list) {
+    try {
       std::rethrow_exception(e);
-    }
-    catch (std::exception const &e)
-    {
+    } catch (std::exception const &e) {
 #if _DEBUG
       std::cout << "Failure" << std::endl;
 #endif
@@ -32,9 +27,7 @@ static auto exception_handler = [](sycl::exception_list e_list)
 //************************************
 // Vector add in SYCL on device: returns sum in 4th parameter "sum".
 //************************************
-void
-VectorAdd(queue &q, const int *a, const int *b, int *sum, size_t size)
-{
+void VectorAdd(queue &q, const int *a, const int *b, int *sum, size_t size) {
   range<1> num_items{size};
   auto e = q.parallel_for(num_items, [=](auto i) { sum[i] = a[i] + b[i]; });
   e.wait();
@@ -43,26 +36,21 @@ VectorAdd(queue &q, const int *a, const int *b, int *sum, size_t size)
 //************************************
 // Initialize the array from 0 to array_size - 1
 //************************************
-void
-InitializeArray(int *a, size_t size)
-{
+void InitializeArray(int *a, size_t size) {
   for (size_t i = 0; i < size; i++) a[i] = i;
 }
 
 //************************************
 // Demonstrate vector add both in sequential on CPU and in parallel on device.
 //************************************
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   auto total_start_time = std::chrono::high_resolution_clock::now();
 
   if (argc > 1) array_size = std::stoi(argv[1]);
 
   auto selector = default_selector_v;
 
-  try
-  {
+  try {
     queue q(selector, exception_handler);
 
     // Print out the device information used for the kernel code.
@@ -78,8 +66,7 @@ main(int argc, char *argv[])
     int *sum_parallel = malloc_shared<int>(array_size, q);
 
     if ((a == nullptr) || (b == nullptr) || (sum_sequential == nullptr) ||
-        (sum_parallel == nullptr))
-    {
+        (sum_parallel == nullptr)) {
       if (a != nullptr) free(a, q);
       if (b != nullptr) free(b, q);
       if (sum_sequential != nullptr) free(sum_sequential, q);
@@ -98,12 +85,10 @@ main(int argc, char *argv[])
 
     // Vector addition in SYCL.
     auto kernel_start_time = std::chrono::high_resolution_clock::now();
-    for (int iter = 0; iter < ITERATIONS; iter++)
-    {
+    for (int iter = 0; iter < ITERATIONS; iter++) {
       VectorAdd(q, a, b, sum_parallel, array_size);
 
-      if (iter % 10 == 0)
-      {
+      if (iter % 10 == 0) {
         std::cout << "Completed iteration " << iter << std::endl;
       }
     }
@@ -113,10 +98,8 @@ main(int argc, char *argv[])
             kernel_end_time - kernel_start_time);
 
     // Verify that the two arrays are equal.
-    for (size_t i = 0; i < array_size; i++)
-    {
-      if (sum_parallel[i] != sum_sequential[i])
-      {
+    for (size_t i = 0; i < array_size; i++) {
+      if (sum_parallel[i] != sum_sequential[i]) {
         std::cout << "Vector add failed on device.\n";
         return -1;
       }
@@ -126,8 +109,7 @@ main(int argc, char *argv[])
     constexpr size_t indices_size = sizeof(indices) / sizeof(int);
 
     // Print out the result of vector add.
-    for (int i = 0; i < indices_size; i++)
-    {
+    for (int i = 0; i < indices_size; i++) {
       int j = indices[i];
       if (i == indices_size - 1) std::cout << "...\n";
       std::cout << "[" << j << "]: " << j << " + " << j << " = "
@@ -139,11 +121,10 @@ main(int argc, char *argv[])
     free(sum_sequential, q);
     free(sum_parallel, q);
 
-    std::cout << "Kernel execution time for " << ITERATIONS << " iterations: "
-              << kernel_duration.count() << " milliseconds\n";
-  }
-  catch (exception const &e)
-  {
+    std::cout << "Kernel execution time for " << ITERATIONS
+              << " iterations: " << kernel_duration.count()
+              << " milliseconds\n";
+  } catch (exception const &e) {
     std::cout << "An exception is caught while adding two vectors.\n";
     std::terminate();
   }

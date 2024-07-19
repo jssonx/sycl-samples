@@ -11,16 +11,11 @@ using namespace sycl;
 size_t array_size = 100000000;
 
 // Create an exception handler for asynchronous SYCL exceptions
-static auto exception_handler = [](sycl::exception_list e_list)
-{
-  for (std::exception_ptr const &e : e_list)
-  {
-    try
-    {
+static auto exception_handler = [](sycl::exception_list e_list) {
+  for (std::exception_ptr const &e : e_list) {
+    try {
       std::rethrow_exception(e);
-    }
-    catch (std::exception const &e)
-    {
+    } catch (std::exception const &e) {
 #if _DEBUG
       std::cout << "Failure" << std::endl;
 #endif
@@ -32,26 +27,18 @@ static auto exception_handler = [](sycl::exception_list e_list)
 //************************************
 // Vector add in SYCL on device: returns sum in 4th parameter "sum".
 //************************************
-void
-VectorAdd(queue &q1,
-          queue &q2,
-          const int *a,
-          const int *b,
-          int *sum,
-          size_t size)
-{
+void VectorAdd(queue &q1, queue &q2, const int *a, const int *b, int *sum,
+               size_t size) {
   size_t half_size = size / 2;
   range<1> num_items_half{half_size};
 
   auto e1 =
       q1.parallel_for(num_items_half, [=](auto i) { sum[i] = a[i] + b[i]; });
 
-  auto e2 = q2.parallel_for(num_items_half,
-                            [=](auto i)
-                            {
-                              size_t offset = half_size;
-                              sum[i + offset] = a[i + offset] + b[i + offset];
-                            });
+  auto e2 = q2.parallel_for(num_items_half, [=](auto i) {
+    size_t offset = half_size;
+    sum[i + offset] = a[i + offset] + b[i + offset];
+  });
 
   e1.wait();
   e2.wait();
@@ -60,39 +47,31 @@ VectorAdd(queue &q1,
 //************************************
 // Initialize the array from 0 to array_size - 1
 //************************************
-void
-InitializeArray(int *a, size_t size)
-{
+void InitializeArray(int *a, size_t size) {
   for (size_t i = 0; i < size; i++) a[i] = i;
 }
 
 //************************************
 // Demonstrate vector add both in sequential on CPU and in parallel on device.
 //************************************
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   auto start_time = std::chrono::high_resolution_clock::now();
 
   // Change array_size if it was passed as argument
   if (argc > 1) array_size = std::stoi(argv[1]);
 
-  try
-  {
+  try {
     // Select GPU device
     device gpu_device;
     auto platforms = platform::get_platforms();
-    for (auto &platform : platforms)
-    {
+    for (auto &platform : platforms) {
       auto devices = platform.get_devices(info::device_type::gpu);
-      if (!devices.empty())
-      {
+      if (!devices.empty()) {
         gpu_device = devices[0];
         break;
       }
     }
-    if (gpu_device.get_info<info::device::name>().empty())
-    {
+    if (gpu_device.get_info<info::device::name>().empty()) {
       std::cout << "No GPU device found.\n";
       return 1;
     }
@@ -102,14 +81,11 @@ main(int argc, char *argv[])
 
     // Create sub-devices
     std::vector<device> sub_devices;
-    try
-    {
+    try {
       sub_devices = gpu_device.create_sub_devices<
           info::partition_property::partition_by_affinity_domain>(
           info::partition_affinity_domain::next_partitionable);
-    }
-    catch (exception &e)
-    {
+    } catch (exception &e) {
       std::cout << "Failed to create sub-devices: " << e.what() << std::endl;
       std::cout << "Using the main device as a single sub-device.\n";
       sub_devices.push_back(gpu_device);
@@ -135,8 +111,7 @@ main(int argc, char *argv[])
     int *sum_parallel = malloc_shared<int>(array_size, q1);
 
     if ((a == nullptr) || (b == nullptr) || (sum_sequential == nullptr) ||
-        (sum_parallel == nullptr))
-    {
+        (sum_parallel == nullptr)) {
       if (a != nullptr) free(a, q1);
       if (b != nullptr) free(b, q1);
       if (sum_sequential != nullptr) free(sum_sequential, q1);
@@ -157,10 +132,8 @@ main(int argc, char *argv[])
     VectorAdd(q1, q2, a, b, sum_parallel, array_size);
 
     // Verify that the two arrays are equal.
-    for (size_t i = 0; i < array_size; i++)
-    {
-      if (sum_parallel[i] != sum_sequential[i])
-      {
+    for (size_t i = 0; i < array_size; i++) {
+      if (sum_parallel[i] != sum_sequential[i]) {
         std::cout << "Vector add failed on device.\n";
         return -1;
       }
@@ -170,8 +143,7 @@ main(int argc, char *argv[])
     constexpr size_t indices_size = sizeof(indices) / sizeof(int);
 
     // Print out the result of vector add.
-    for (int i = 0; i < indices_size; i++)
-    {
+    for (int i = 0; i < indices_size; i++) {
       int j = indices[i];
       if (i == indices_size - 1) std::cout << "...\n";
       std::cout << "[" << j << "]: " << j << " + " << j << " = "
@@ -182,9 +154,7 @@ main(int argc, char *argv[])
     free(b, q1);
     free(sum_sequential, q1);
     free(sum_parallel, q1);
-  }
-  catch (exception const &e)
-  {
+  } catch (exception const &e) {
     std::cout << "An exception is caught while adding two vectors.\n";
     std::terminate();
   }
