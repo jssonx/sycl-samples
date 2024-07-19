@@ -1,17 +1,17 @@
 CXX = icpx
 CXXFLAGS = -g -O2 -fsycl
 
-TARGETS = demo-1 demo-2 demo-3
+TARGETS = demo_1 demo_2 demo_3
 
 all: $(TARGETS)
 
-demo-1: demo-1.cpp
+demo_1: demo_1.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-demo-2: demo-2.cpp
+demo_2: demo_2.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-demo-3: demo-3.cpp
+demo_3: demo_3.cpp
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 clean:

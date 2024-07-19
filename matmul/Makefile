@@ -1,18 +1,21 @@
 CXX = icpx
-SYCL_CXXFLAGS = -std=c++17 -fsycl -g -O2 -o 
-SYCL_LDFLAGS = 
-SYCL_EXE_NAME = matrix_mul_dpc
-SYCL_SOURCES = matrix_mul_sycl.cpp
+CXXFLAGS = -g -O2 -fsycl -std=c++17
 
-all: build_sycl
+TARGETS = matmul_1gpu \
+		  matmul_2gpu
 
-build_sycl:
-	$(CXX) $(SYCL_CXXFLAGS) $(SYCL_EXE_NAME) $(SYCL_SOURCES) $(SYCL_LDFLAGS)
+SRC_MATMUL_1GPU = matmul_1gpu.cpp
+SRC_MATMUL_2GPU = matmul_2gpu.cpp
 
-run: run_sycl
+.PHONY: all clean run
 
-run_sycl:
-	./$(SYCL_EXE_NAME)
+all: $(TARGETS)
 
-clean: 
-	rm -rf $(SYCL_EXE_NAME)
+matmul_1gpu: $(SRC_MATMUL_1GPU)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+matmul_2gpu: $(SRC_MATMUL_2GPU)
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+clean:
+	rm -f $(TARGETS)
