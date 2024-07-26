@@ -5,13 +5,10 @@
 #include <random>
 #include <sycl/sycl.hpp>
 
-constexpr int m_size = 7200 * 8;
-constexpr int M = m_size / 8;
-constexpr int N = m_size / 4;
-constexpr int P = m_size / 2;
-constexpr int ITERATIONS = 25;
-constexpr int VERIFICATION_SAMPLES =
-    2000;  // Number of random samples to verify
+constexpr int M = 12288;
+constexpr int N = 128;
+constexpr int P = 2048;
+constexpr int VERIFICATION_SAMPLES = 2000;  // Number of random samples to verify
 
 static auto exception_handler = [](sycl::exception_list e_list) {
   for (std::exception_ptr const& e : e_list) {
@@ -33,11 +30,14 @@ void initializeMatrixB(sycl::queue& q, float (*b)[P]);
 
 int main(int argc, char* argv[]) {
   int num_gpu = 6;
+  int iterations = 50;
   bool full_verify = false;
   
   for (int i = 1; i < argc; ++i) {
     if (std::strcmp(argv[i], "--full-verify") == 0) {
       full_verify = true;
+    } else if (std::strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+      iterations = std::stoi(argv[++i]);
     } else {
       num_gpu = std::stoi(argv[i]);
     }
@@ -97,9 +97,10 @@ int main(int argc, char* argv[]) {
     std::cout << "Problem size: c(" << M << "x" << P << ") = a(" << M << "x"
               << N << ") * b(" << N << "x" << P << ")\n";
 
-    for (int iter = 0; iter < ITERATIONS; ++iter) {
-      std::cout << "Iteration " << iter + 1 << " of " << ITERATIONS
-                << std::endl;
+    for (int iter = 0; iter < iterations; ++iter) {
+      if ((iter + 1) % 100 == 0) {  // Check if the iteration number is a multiple of 100
+        std::cout << "Iteration " << iter + 1 << " of " << iterations << std::endl;
+      }
 
       for (int i = 0; i < num_gpu; ++i) {
         matmul(queues[i], a_matrices[i], b_matrices[i], c_matrices[i]);
