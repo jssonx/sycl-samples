@@ -1,0 +1,11 @@
+SRCS	= ./main.cc ./func1.cc ./func2.cc ./common.cc
+TARGET	= single.sycloffload.icpx.intelgpu${TARGET_SUFFIX}
+
+default all: $(TARGET)
+
+CXX = icpx
+OMPFLAGS = -g -O2 -fsycl -fopenmp -lm -qopenmp -fopenmp-targets=spir64
+
+$(TARGET): ${SRCS}
+	$(CXX) $(OMPFLAGS) -o $(TARGET) ${SRCS}
+	@echo ""
