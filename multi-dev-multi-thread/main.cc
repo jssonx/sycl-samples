@@ -17,13 +17,13 @@ int main()
 #pragma omp sections nowait
             {
 #pragma omp section
-                kernel_submission_1(queue1, 1, 40000000);
+                kernel_submission(queue1, 1, 10000000);
 
 #pragma omp section
-                kernel_submission_1(queue2, 2, 40000000);
+                kernel_submission(queue2, 2, 10000000);
 
 #pragma omp section
-                kernel_submission_1(queue3, 2, 400000);
+                kernel_submission(queue3, 2, 10000000);
             }
         }
 

@@ -12,7 +12,7 @@ double **pptr3;
 double **pptr4;
 
 /* Parameters governing the size of the test */
-#define        N 40000000      /* size of the data arrays used */
+#define        N 10000000      /* size of the data arrays used */
 #define        NITER 1         /* number of iterations performed by each thread */
 
 size_t nn = N;

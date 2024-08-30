@@ -1,5 +1,5 @@
-SRCS	= ./main.cc ./func1.cc ./func2.cc ./common.cc
-TARGET	= single.sycloffload.icpx.intelgpu${TARGET_SUFFIX}
+SRCS	= ./main.cc ./func.cc ./common.cc
+TARGET	= omp.sycloffload.icpx.intelgpu${TARGET_SUFFIX}
 
 default all: $(TARGET)
 

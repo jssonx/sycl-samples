@@ -1,6 +1,6 @@
 #include "common.h"
 
-void kernel_submission_1(cl::sycl::queue queue, int thread_id, size_t X)
+void kernel_submission(cl::sycl::queue queue, int thread_id, size_t X)
 {
     std::vector<int> a(X, thread_id);
     std::vector<int> b(X, thread_id);
