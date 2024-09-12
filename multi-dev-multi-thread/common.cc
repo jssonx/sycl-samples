@@ -1,12 +1,26 @@
 #include "common.h"
+#include <sys/syscall.h>
+#include <unistd.h>
 
-cl::sycl::queue initgpu(int deviceIndex)
+cl::sycl::queue createQueue(const cl::sycl::device& device) {
+    cl::sycl::queue queue(device, cl::sycl::property::queue::enable_profiling{});
+
+    std::cout << "Created queue on device: "
+              << queue.get_device().get_info<cl::sycl::info::device::name>() << "\n";
+    std::cout << "Max compute units: " << device.get_info<cl::sycl::info::device::max_compute_units>() << "\n";
+    std::cout << "Max work-group size: " << device.get_info<cl::sycl::info::device::max_work_group_size>() << "\n";
+
+    return queue;
+}
+
+std::vector<cl::sycl::device> initgpu()
 {
     try
     {
         // Get all devices of type GPU
         auto platforms = cl::sycl::platform::get_platforms();
         std::vector<cl::sycl::device> gpus;
+        std::vector<cl::sycl::device> all_sub_devices;
 
         for (const auto &platform : platforms)
         {
@@ -17,31 +31,36 @@ cl::sycl::queue initgpu(int deviceIndex)
         if (gpus.empty())
         {
             std::cerr << "No GPU devices found.\n";
+            std::terminate();
         }
 
-        // Choose the device based on the provided index
-        cl::sycl::device selectedDevice;
-        if (deviceIndex >= 0 && deviceIndex < gpus.size())
+        // Create sub-devices for each GPU
+        for (const auto &gpu : gpus)
         {
-            selectedDevice = gpus[deviceIndex];
+            try
+            {
+                // Try to create sub-devices based on compute units
+                auto sub_devices = gpu.create_sub_devices<
+                    cl::sycl::info::partition_property::partition_by_affinity_domain>(
+                    cl::sycl::info::partition_affinity_domain::next_partitionable);
+                
+                all_sub_devices.insert(all_sub_devices.end(), sub_devices.begin(), sub_devices.end());
+                
+                std::cout << "Created " << sub_devices.size() << " sub-devices for GPU: " 
+                          << gpu.get_info<cl::sycl::info::device::name>() << "\n";
+            }
+            catch (cl::sycl::exception &e)
+            {
+                std::cout << "Failed to create sub-devices for GPU " 
+                          << gpu.get_info<cl::sycl::info::device::name>() 
+                          << ": " << e.what() << "\n";
+                std::cout << "Using the main device as a single sub-device.\n";
+                all_sub_devices.push_back(gpu);
+            }
         }
-        else
-        {
-            std::cout << "Invalid device index or no index provided. Using the first available GPU.\n";
-            selectedDevice = gpus[0];
-        }
 
-        cl::sycl::queue queue(selectedDevice, cl::sycl::property::queue::enable_profiling{});
-
-        // Print out the device information used for the kernel code.
-        std::cout << "Running on device: "
-                  << queue.get_device().get_info<cl::sycl::info::device::name>() << "\n";
-
-        auto device = queue.get_device();
-        std::cout << "Max compute units: " << device.get_info<cl::sycl::info::device::max_compute_units>() << "\n";
-        std::cout << "Max work-group size: " << device.get_info<cl::sycl::info::device::max_work_group_size>() << "\n";
-        std::cout << "Device name: " << device.get_info<cl::sycl::info::device::name>() << "\n";
-        return queue;
+        // return gpus;
+        return all_sub_devices;
     }
     catch (cl::sycl::exception const &e)
     {
@@ -50,11 +69,15 @@ cl::sycl::queue initgpu(int deviceIndex)
     }
 }
 
-void vecadd_kernel(cl::sycl::queue &queue, std::vector<int> &a, std::vector<int> &b, std::vector<int> &c, size_t N, int thread_id, int iteration)
+void vecadd_kernel(cl::sycl::queue &queue, std::vector<int> &a, std::vector<int> &b, std::vector<int> &c, size_t N, int iteration, const std::string &func_name)
 {
     cl::sycl::buffer<int, 1> buffer_a(a.data(), cl::sycl::range<1>(N));
     cl::sycl::buffer<int, 1> buffer_b(b.data(), cl::sycl::range<1>(N));
     cl::sycl::buffer<int, 1> buffer_c(c.data(), cl::sycl::range<1>(N));
+    
+    pid_t tid = syscall(SYS_gettid);
+
+    std::cout << "Thread " << tid << ", iteration " << iteration << ", " << func_name <<" started.\n";
 
     cl::sycl::event event = queue.submit([&](cl::sycl::handler &cgh)
                                          {
@@ -75,5 +98,5 @@ void vecadd_kernel(cl::sycl::queue &queue, std::vector<int> &a, std::vector<int>
     auto end = event.get_profiling_info<cl::sycl::info::event_profiling::command_end>();
     double duration = (end - start) / 1e3;
 
-    std::cout << "Thread " << thread_id << ", iteration " << iteration << ", kernel executed in " << duration << " us. " << "Kernel start: " << start / 1e3 << " us, end: " << end / 1e3 << "\n";
+    std::cout << "Thread " << tid << ", iteration " << iteration << ", " << func_name <<" executed in " << duration << " us. " << "Kernel start: " << start / 1e3 << " us, end: " << end / 1e3 << "\n";
 }

@@ -5,10 +5,11 @@
 #include <iostream>
 #include <vector>
 
-constexpr size_t LOOP_COUNT = 2;
+constexpr size_t LOOP_COUNT = 10;
 
-cl::sycl::queue initgpu(int deviceIndex = -1);
-void vecadd_kernel(cl::sycl::queue &queue, std::vector<int> &a, std::vector<int> &b, std::vector<int> &c, size_t N, int thread_id, int iteration);
-void kernel_submission(cl::sycl::queue queue, int thread_id, size_t X);
+std::vector<cl::sycl::device> initgpu();
+cl::sycl::queue createQueue(const cl::sycl::device& device);
+void vecadd_kernel(cl::sycl::queue &queue, std::vector<int> &a, std::vector<int> &b, std::vector<int> &c, size_t N, int iteration, const std::string& func_name);
+void kernel_submission(cl::sycl::queue queue, size_t X, const std::string& func_name);
 
 #endif // COMMON_H

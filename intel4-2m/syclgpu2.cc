@@ -40,7 +40,7 @@ twork2( int iter, int threadnum)
   buffer<double, 1> c(p1, nn);
 
   // run kernel 10 times
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     q4.submit([&](handler &h) {
       accessor d_l1(a, h, read_only);
       accessor d_r1(b, h, read_only);
@@ -58,16 +58,18 @@ twork2( int iter, int threadnum)
     checkdata(k, pptr4[k], nn );
   }
 
-  q4.submit([&](handler &h) {
-    accessor d_l1(a, h, read_only);
-    accessor d_r1(b, h, read_only);
-    accessor d_p1(c, h, write_only);
-    h.parallel_for(nelements, [=](auto i) {
-      for (int kk = 0 ; kk < kkmax ; kk++ ) {
-        d_p1[i] = d_p1[i] + d_l1[nelements - kk] / double(kkmax) + d_r1[kk] / double(kkmax);
-      }
+  for (int i = 0; i < 10; i++) {
+    q4.submit([&](handler &h) {
+      accessor d_l1(a, h, read_only);
+      accessor d_r1(b, h, read_only);
+      accessor d_p1(c, h, write_only);
+      h.parallel_for(nelements, [=](auto i) {
+        for (int kk = 0 ; kk < kkmax ; kk++ ) {
+          d_p1[i] = d_p1[i] + d_l1[nelements - kk] / double(kkmax) + d_r1[kk] / double(kkmax);
+        }
+      } );
     } );
-  } );
+  }
 
   for (int k = 0; k < omp_num_t; k++) {
     output(k, pptr4[k], nn, "result p4 array");
@@ -101,7 +103,7 @@ twork3( int iter, int threadnum)
   buffer<double, 1> c(p1, nn);
 
   // run kernel 10 times
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     q4.submit([&](handler &h) {
       accessor d_l1(a, h, read_only);
       accessor d_r1(b, h, read_only);
@@ -119,16 +121,18 @@ twork3( int iter, int threadnum)
     checkdata(k, pptr4[k], nn );
   }
 
-  q4.submit([&](handler &h) {
-    accessor d_l1(a, h, read_only);
-    accessor d_r1(b, h, read_only);
-    accessor d_p1(c, h, write_only);
-    h.parallel_for(nelements, [=](auto i) {
-      for (int kk = 0 ; kk < kkmax ; kk++ ) {
-        d_p1[i] = d_p1[i] + d_l1[nelements - kk] / double(kkmax) + d_r1[kk] / double(kkmax);
-      }
+  for (int i = 0; i < 10; i++) {
+    q4.submit([&](handler &h) {
+      accessor d_l1(a, h, read_only);
+      accessor d_r1(b, h, read_only);
+      accessor d_p1(c, h, write_only);
+      h.parallel_for(nelements, [=](auto i) {
+        for (int kk = 0 ; kk < kkmax ; kk++ ) {
+          d_p1[i] = d_p1[i] + d_l1[nelements - kk] / double(kkmax) + d_r1[kk] / double(kkmax);
+        }
+      } );
     } );
-  } );
+  }
 
   for (int k = 0; k < omp_num_t; k++) {
     output(k, pptr4[k], nn, "result p4 array");

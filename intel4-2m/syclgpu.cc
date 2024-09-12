@@ -41,7 +41,7 @@ twork( int iter, int threadnum)
   buffer<double, 1> b(r1, nn);
   buffer<double, 1> c(p1, nn);
 
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     q4.submit([&](handler &h) {
       accessor d_l1(a, h, read_only);
       accessor d_r1(b, h, read_only);
