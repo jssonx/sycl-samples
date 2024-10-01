@@ -1,9 +1,9 @@
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <iostream>
 #include <vector>
 
-using namespace cl::sycl;
+using namespace sycl;
 
 void vector_add(queue& q, buffer<int>& a_buf, buffer<int>& b_buf,
                 buffer<int>& c_buf, size_t n) {

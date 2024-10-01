@@ -1,8 +1,8 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <iostream>
 #include <vector>
 
-using namespace cl::sycl;
+using namespace sycl;
 
 int main() {
   try {

@@ -1,18 +1,19 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <iostream>
 #include <thread>
 #include <omp.h>
 #include "common.h"
 
+
 int main()
 {
     try
     {
-        std::vector<cl::sycl::device> devices = initgpu();
-        cl::sycl::queue queue1 = createQueue(devices[0]);
-        cl::sycl::queue queue2 = createQueue(devices[1]);
-        cl::sycl::queue queue3 = createQueue(devices[2]);
-        cl::sycl::queue queue4 = createQueue(devices[3]);
+        std::vector<sycl::device> devices = initgpu();
+        sycl::queue queue1 = createQueue(devices[0]);
+        sycl::queue queue2 = createQueue(devices[1]);
+        sycl::queue queue3 = createQueue(devices[2]);
+        sycl::queue queue4 = createQueue(devices[3]);
 
         #pragma omp parallel num_threads(4)
         {
@@ -34,7 +35,7 @@ int main()
 
         std::cout << "All threads have finished execution.\n";
     }
-    catch (cl::sycl::exception const &e)
+    catch (sycl::exception const &e)
     {
         std::cout << "SYCL exception caught in main: " << e.what() << std::endl;
     }

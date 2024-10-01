@@ -12,7 +12,7 @@
 #include <cmath>
 #include <time.h>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 extern size_t nn;
 extern int omp_num_t;
